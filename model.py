@@ -31,11 +31,14 @@ df['slot_type_enc'] = le_slot.fit_transform(df['slot_type'])
 # Convert event day to binary
 df['is_event_day'] = df['is_event_day'].astype(str).str.upper().map({'TRUE': 1, 'FALSE': 0})
 
+# Add is_weekend feature (1 for Saturday and Sunday, else 0)
+df['is_weekend'] = df['day_of_week'].isin(['Saturday', 'Sunday']).astype(int)
+
 # Drop rows with missing required data
 df.dropna(subset=['day_of_week_enc', 'slot_type_enc', 'hour_of_day', 'is_event_day', 'wait_time_minute'], inplace=True)
 
-# Define features
-features = ['day_of_week_enc', 'slot_type_enc', 'hour_of_day', 'is_event_day']
+# Define features including is_weekend
+features = ['day_of_week_enc', 'slot_type_enc', 'hour_of_day', 'is_event_day', 'is_weekend']
 
 # ======================== REGRESSION (Wait Time) ========================
 print("\n===== Wait Time Models Evaluation =====")
