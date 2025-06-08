@@ -4,7 +4,7 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 import joblib
 
@@ -31,15 +31,17 @@ df['slot_type_enc'] = le_slot.fit_transform(df['slot_type'])
 # Convert event day to binary
 df['is_event_day'] = df['is_event_day'].astype(str).str.upper().map({'TRUE': 1, 'FALSE': 0})
 
-# Drop rows with any NaNs
+# Drop rows with missing required data
 df.dropna(subset=['day_of_week_enc', 'slot_type_enc', 'hour_of_day', 'is_event_day', 'wait_time_minute'], inplace=True)
 
-# ========== Wait Time (Regression) ==========
-print("\n===== Wait Time Models Evaluation =====")
+# Define features
 features = ['day_of_week_enc', 'slot_type_enc', 'hour_of_day', 'is_event_day']
+
+# ======================== REGRESSION (Wait Time) ========================
+print("\n===== Wait Time Models Evaluation =====")
+
 X_time = df[features]
 y_time = df['wait_time_minute']
-X_train, X_test, y_train, y_test = train_test_split(X_time, y_time, test_size=0.2, random_state=42)
 
 regressors = {
     "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
@@ -48,37 +50,38 @@ regressors = {
 }
 
 best_reg_model = None
-best_r2 = float('-inf')
+best_r2_score = float('-inf')
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
 for name, model in regressors.items():
     try:
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        mse = mean_squared_error(y_test, y_pred)
-        rmse = np.sqrt(mse)
-        mae = mean_absolute_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
+        neg_mse = cross_val_score(model, X_time, y_time, cv=kf, scoring='neg_mean_squared_error')
+        rmse = np.sqrt(-neg_mse).mean()
+        mae = -cross_val_score(model, X_time, y_time, cv=kf, scoring='neg_mean_absolute_error').mean()
+        r2 = cross_val_score(model, X_time, y_time, cv=kf, scoring='r2').mean()
 
         print(f"\n{name} Regression:")
-        print(f"  RMSE: {rmse:.2f}")
-        print(f"  MAE: {mae:.2f}")
-        print(f"  R² Score: {r2:.3f}")
+        print(f"  Avg RMSE: {rmse:.2f}")
+        print(f"  Avg MAE: {mae:.2f}")
+        print(f"  Avg R² Score: {r2:.3f}")
 
-        if r2 > best_r2:
-            best_r2 = r2
+        if r2 > best_r2_score:
+            best_r2_score = r2
             best_reg_model = model
     except Exception as e:
         print(f"\n{name} failed with error: {e}")
 
+# Retrain best regression model on full data
+best_reg_model.fit(X_time, y_time)
 joblib.dump(best_reg_model, 'wait_time_model.pkl')
 
-# ========== Slot Availability (Classification) ==========
-print("\n===== Slot Availability Models Evaluation =====")
-df['slot_available'] = (df['wait_time_minute'] == 0).astype(int)
 
+# ======================== CLASSIFICATION (Slot Availability) ========================
+print("\n===== Slot Availability Models Evaluation =====")
+
+df['slot_available'] = (df['wait_time_minute'] == 0).astype(int)
 X_clf = df[features]
 y_clf = df['slot_available']
-X_train, X_test, y_train, y_test = train_test_split(X_clf, y_clf, test_size=0.2, random_state=42)
 
 classifiers = {
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
@@ -87,27 +90,29 @@ classifiers = {
 }
 
 best_clf_model = None
-best_clf_acc = 0
+best_acc = 0
 
 for name, clf in classifiers.items():
     try:
-        clf.fit(X_train, y_train)
-        y_pred = clf.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
+        acc_scores = cross_val_score(clf, X_clf, y_clf, cv=kf, scoring='accuracy')
+        avg_acc = acc_scores.mean()
 
         print(f"\n{name} Classifier:")
-        print(f"  Accuracy: {acc:.3f}")
-        print(classification_report(y_test, y_pred, zero_division=0))
+        print(f"  Accuracy (5-Fold Avg): {avg_acc:.3f}")
 
-        if acc > best_clf_acc:
-            best_clf_acc = acc
+        if avg_acc > best_acc:
+            best_acc = avg_acc
             best_clf_model = clf
     except Exception as e:
         print(f"\n{name} failed with error: {e}")
 
+# Retrain best classifier model on full data
+best_clf_model.fit(X_clf, y_clf)
 joblib.dump(best_clf_model, 'availability_model.pkl')
+
+# Save encoders
 joblib.dump(le_day, 'labelencoder_day.pkl')
 joblib.dump(le_slot, 'labelencoder_slot.pkl')
 
-print("\n✅ Best models saved successfully.")
+print("\nBest models saved successfully.")
 
