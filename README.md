@@ -83,11 +83,11 @@ The server will start on `http://localhost:5000` by default.
 **Request Body**:
 ```json
 {
-    "slot_id": "s1",
-    "day_of_week": "Monday",
-    "hour": 14,
-    "event_name": "Regular Day",
-    "is_event_day": 0
+  "day_of_week": "Monday",
+  "slot_type": "car",
+  "checkin_timestamp": "2025-01-06 10:01:10",
+  "is_event_day": true,
+  "is_weekend": false
 }
 ```
 
