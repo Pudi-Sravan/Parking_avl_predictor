@@ -1,11 +1,12 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression, HuberRegressor
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, classification_report
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, classification_report, make_scorer, precision_score, recall_score, f1_score, accuracy_score, roc_auc_score
+from sklearn.model_selection import train_test_split, KFold, cross_val_score, cross_validate
 from sklearn.preprocessing import LabelEncoder
+
 import joblib
 
 # Load dataset
@@ -49,7 +50,8 @@ y_time = df['wait_time_minute']
 regressors = {
     "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
     "Decision Tree": DecisionTreeRegressor(random_state=42),
-    "Linear Regression": LinearRegression()
+    "Linear Regression": LinearRegression(),
+    "Huber Regressor": HuberRegressor(),
 }
 
 best_reg_model = None
@@ -75,9 +77,9 @@ for name, model in regressors.items():
         print(f"\n{name} failed with error: {e}")
 
 # Retrain best regression model on full data
-best_reg_model.fit(X_time, y_time)
-joblib.dump(best_reg_model, 'wait_time_model.pkl')
-
+if best_reg_model is not None:
+    best_reg_model.fit(X_time, y_time)
+    joblib.dump(best_reg_model, 'wait_time_model.pkl')
 
 # ======================== CLASSIFICATION (Slot Availability) ========================
 print("\n===== Slot Availability Models Evaluation =====")
@@ -92,30 +94,45 @@ classifiers = {
     "Logistic Regression": LogisticRegression(max_iter=500)
 }
 
-best_clf_model = None
-best_acc = 0
+scoring = {
+    'accuracy': 'accuracy',
+    'f1': make_scorer(f1_score, zero_division=0),
+    'precision': make_scorer(precision_score, zero_division=0),
+    'recall': make_scorer(recall_score, zero_division=0),
+    'roc_auc': 'roc_auc'
+}
+
+best_score = 0
+best_clf = None
 
 for name, clf in classifiers.items():
+
+    
     try:
-        acc_scores = cross_val_score(clf, X_clf, y_clf, cv=kf, scoring='accuracy')
-        avg_acc = acc_scores.mean()
+        scores = cross_validate(clf, X_clf, y_clf, cv=kf, scoring=scoring)
 
-        print(f"\n{name} Classifier:")
-        print(f"  Accuracy (5-Fold Avg): {avg_acc:.3f}")
+        print(f"\n{name}:")
+        print(f"  Accuracy: {np.mean(scores['test_accuracy']):.3f}")
+        print(f"  F1 Score: {np.mean(scores['test_f1']):.3f}")
+        print(f"  Precision: {np.mean(scores['test_precision']):.3f}")
+        print(f"  Recall: {np.mean(scores['test_recall']):.3f}")
+        print(f"  ROC AUC: {np.mean(scores['test_roc_auc']):.3f}")
 
-        if avg_acc > best_acc:
-            best_acc = avg_acc
-            best_clf_model = clf
+        if np.mean(scores['test_f1']) > best_score:
+            best_score = np.mean(scores['test_f1'])
+            best_clf = clf
     except Exception as e:
-        print(f"\n{name} failed with error: {e}")
+        print(f"{name} failed: {e}")
 
 # Retrain best classifier model on full data
-best_clf_model.fit(X_clf, y_clf)
-joblib.dump(best_clf_model, 'availability_model.pkl')
+if best_clf is not None:
+    best_clf.fit(X_clf, y_clf)
+    joblib.dump(best_clf, 'availability_model.pkl')
 
 # Save encoders
 joblib.dump(le_day, 'labelencoder_day.pkl')
 joblib.dump(le_slot, 'labelencoder_slot.pkl')
 
 print("\nBest models saved successfully.")
-
+print("clf : ", best_clf, "\n")
+print("reg : ", best_reg_model, "\n")

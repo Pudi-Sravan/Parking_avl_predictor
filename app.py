@@ -10,8 +10,12 @@ availability_model = joblib.load('availability_model.pkl')
 le_day = joblib.load('labelencoder_day.pkl')
 le_slot = joblib.load('labelencoder_slot.pkl')
 
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['GET', 'POST'])
+
 def predict_wait_time():
+    
+    if request.method == 'GET':
+        return "✅ This route only works with POST. Use a tool like curl or Postman."
     data = request.get_json()
 
     try:
