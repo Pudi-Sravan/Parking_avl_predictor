@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 # Load the trained models and encoders
 wait_time_model = joblib.load('wait_time_model.pkl')

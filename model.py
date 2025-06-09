@@ -4,7 +4,7 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression, HuberRegressor
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, accuracy_score, classification_report, make_scorer, precision_score, recall_score, f1_score, accuracy_score, roc_auc_score
-from sklearn.model_selection import train_test_split, KFold, cross_val_score, cross_validate
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, cross_val_score, cross_validate
 from sklearn.preprocessing import LabelEncoder
 
 import joblib
@@ -56,14 +56,14 @@ regressors = {
 
 best_reg_model = None
 best_r2_score = float('-inf')
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
+kf_reg = KFold(n_splits=5, shuffle=True, random_state=42)
 
 for name, model in regressors.items():
     try:
-        neg_mse = cross_val_score(model, X_time, y_time, cv=kf, scoring='neg_mean_squared_error')
+        neg_mse = cross_val_score(model, X_time, y_time, cv=kf_reg, scoring='neg_mean_squared_error')
         rmse = np.sqrt(-neg_mse).mean()
-        mae = -cross_val_score(model, X_time, y_time, cv=kf, scoring='neg_mean_absolute_error').mean()
-        r2 = cross_val_score(model, X_time, y_time, cv=kf, scoring='r2').mean()
+        mae = -cross_val_score(model, X_time, y_time, cv=kf_reg, scoring='neg_mean_absolute_error').mean()
+        r2 = cross_val_score(model, X_time, y_time, cv=kf_reg, scoring='r2').mean()
 
         print(f"\n{name} Regression:")
         print(f"  Avg RMSE: {rmse:.2f}")
@@ -104,12 +104,12 @@ scoring = {
 
 best_score = 0
 best_clf = None
-
+kf_clf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 for name, clf in classifiers.items():
 
     
     try:
-        scores = cross_validate(clf, X_clf, y_clf, cv=kf, scoring=scoring)
+        scores = cross_validate(clf, X_clf, y_clf, cv=kf_clf, scoring=scoring)
 
         print(f"\n{name}:")
         print(f"  Accuracy: {np.mean(scores['test_accuracy']):.3f}")
