@@ -84,10 +84,11 @@ The server will start on `http://localhost:5000` by default.
 ```json
 {
   "day_of_week": "Monday",
-  "slot_type": "car",
-  "checkin_timestamp": "2025-01-06 10:01:10",
-  "is_event_day": true,
-  "is_weekend": false
+  "slot_type": "abled",
+  "event_type": "regular",
+  "checkin_timestamp": "2024-07-25 16:00:00",
+  "is_event_day": 0,
+  "is_weekend": 1
 }
 ```
 
