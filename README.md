@@ -39,7 +39,7 @@ source parking_env/bin/activate
 Install all necessary Python packages using pip:
 
 ```bash
-pip install pandas scikit-learn flask joblib numpy
+pip install -r requirements.txt
 ```
 
 #### Package Details:
@@ -88,16 +88,6 @@ The server will start on `http://localhost:5000` by default.
   "checkin_timestamp": "2025-01-06 10:01:10",
   "is_event_day": true,
   "is_weekend": false
-}
-```
-
-**Response**:
-```json
-{
-    "slot_id": "s1",
-    "availability_prediction": 1,
-    "wait_time_prediction": 3.5,
-    "slot_type": "car"
 }
 ```
 
