@@ -11,7 +11,7 @@ from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score
 
 # ======================== Load and Preprocess Data ========================
 
-df = pd.read_csv('info.csv')
+df = pd.read_csv('sorted_walmart_data.csv')
 
 df['checkin_timestamp'] = pd.to_datetime(df['checkin_timestamp'].astype(str).str.strip(), errors='coerce')
 df['checkout_timestamp'] = pd.to_datetime(df['checkout_timestamp'].astype(str).str.strip(), errors='coerce')
@@ -20,10 +20,7 @@ print("Checkin parsing errors:", df['checkin_timestamp'].isna().sum())
 print("Checkout parsing errors:", df['checkout_timestamp'].isna().sum())
 
 df['hour_of_day'] = df['checkin_timestamp'].dt.hour
-df['duration_minutes'] = (df['checkout_timestamp'] - df['checkin_timestamp']).dt.total_seconds() / 60
-
-# Add derived features
-df['is_weekend'] = df['checkin_timestamp'].dt.dayofweek.isin([5, 6]).astype(int)  # 5 = Saturday, 6 = Sunday
+df['is_weekend'] = df['checkin_timestamp'].dt.dayofweek.isin([5, 6]).astype(int)  # Saturday=5, Sunday=6
 df['is_event_day'] = df['is_event_day'].astype(int)
 
 # ======================== Label Encoding ========================
@@ -36,9 +33,12 @@ df['day_of_week_enc'] = le_day.fit_transform(df['day_of_week'])
 df['slot_type_enc'] = le_slot.fit_transform(df['slot_type'])
 df['event_type_enc'] = le_event.fit_transform(df['event_type'])
 
-df.dropna(subset=['day_of_week_enc', 'slot_type_enc', 'event_type_enc', 'hour_of_day', 'duration_minutes'], inplace=True)
+df.dropna(subset=[
+    'day_of_week_enc', 'slot_type_enc', 'event_type_enc',
+    'hour_of_day', 'wait_time_minute'
+], inplace=True)
 
-# ======================== Feature Set ========================
+# ======================== Shared Feature Set ========================
 
 features = [
     'day_of_week_enc',
@@ -49,11 +49,11 @@ features = [
     'is_weekend'
 ]
 
-# ======================== Wait Time Prediction ========================
+# ======================== Wait Time Prediction (Regression) ========================
 
 print("\n===== Wait Time Prediction (Regression) =====")
 X_time = df[features]
-y_time = df['duration_minutes']
+y_time = df['wait_time_minute']
 
 regressors = {
     "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
@@ -84,18 +84,13 @@ if best_reg_model is not None:
     best_reg_model.fit(X_time, y_time)
     joblib.dump(best_reg_model, 'wait_time_model.pkl')
 
-# ======================== Slot Availability Prediction ========================
+# ======================== Slot Availability Prediction (Classification) ========================
 
 print("\n===== Slot Availability Prediction (Classification) =====")
 df["is_slot_available"] = df["wait_time_minute"].apply(lambda x: 1 if x <= 5 else 0)
 
-X_clf = df[["day_of_week", "slot_type", "event_type", "is_event_day"]].copy()
+X_clf = df[features]
 y_clf = df["is_slot_available"]
-
-# Encode using same encoders
-X_clf["day_of_week"] = le_day.transform(X_clf["day_of_week"])
-X_clf["slot_type"] = le_slot.transform(X_clf["slot_type"])
-X_clf["event_type"] = le_event.transform(X_clf["event_type"])
 
 classifiers = {
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),

@@ -14,14 +14,16 @@ le_day = joblib.load('labelencoder_day.pkl')
 le_slot = joblib.load('labelencoder_slot.pkl')
 le_event = joblib.load('labelencoder_event.pkl')
 
-# =================== Utility Functions ===================
+# =================== Utility Function ===================
 
 def encode_input(data):
     try:
-        # Convert timestamp to hour
-        hour_of_day = pd.to_datetime(data['checkin_timestamp']).hour
+        # Parse timestamp to get hour and weekend info
+        checkin_ts = pd.to_datetime(data['checkin_timestamp'])
+        hour_of_day = checkin_ts.hour
+        is_weekend = 1 if checkin_ts.dayofweek in [5, 6] else 0
 
-        # Encode features
+        # Encode categorical features
         day_enc = le_day.transform([data['day_of_week']])[0]
         slot_enc = le_slot.transform([data['slot_type']])[0]
         event_enc = le_event.transform([data['event_type']])[0]
@@ -32,7 +34,7 @@ def encode_input(data):
             "event_type_enc": event_enc,
             "hour_of_day": hour_of_day,
             "is_event_day": int(data['is_event_day']),
-            "is_weekend": int(data['is_weekend']),
+            "is_weekend": is_weekend
         }, None
 
     except Exception as e:
@@ -63,14 +65,7 @@ def predict_availability():
     if error:
         return jsonify({'error': error}), 400
 
-    # Only include the features used for classification
-    input_df = pd.DataFrame([{
-        'day_of_week': encoded['day_of_week_enc'],
-        'slot_type': encoded['slot_type_enc'],
-        'event_type': encoded['event_type_enc'],
-        'is_event_day': encoded['is_event_day']
-    }])
-
+    input_df = pd.DataFrame([encoded])
     try:
         probability = availability_model.predict_proba(input_df)[0][1]
         return jsonify({'probability_slot_available': round(probability, 3)})
