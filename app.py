@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 import joblib
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -72,7 +73,54 @@ def predict_availability():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/newdata', methods=['POST'])
+def log_new_data():
+    data = request.get_json()
+
+    required_fields = [
+        "slot_id",
+        "checkin_timestamp",
+        "checkout_timestamp",
+        "day_of_week",
+        "slot_type",
+        "event_type",
+        "is_event_day",
+        "wait_time_minute"
+    ]
+
+    missing = [field for field in required_fields if field not in data]
+    if missing:
+        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+
+    # Prepare row for CSV
+    row = {
+        "slot_id": data["slot_id"],
+        "checkin_timestamp": data["checkin_timestamp"],
+        "checkout_timestamp": data["checkout_timestamp"],
+        "day_of_week": data["day_of_week"],
+        "slot_type": data["slot_type"],
+        "event_type": data["event_type"],
+        "is_event_day": int(data["is_event_day"]),
+        "wait_time_minute": float(data["wait_time_minute"])
+    }
+
+    # Save to CSV
+    try:
+        df = pd.DataFrame([row])
+        file_exists = os.path.isfile("walmart_parking_data_jan.csv")
+        df.to_csv("walmart_parking_data_jan.csv", mode='a', header=not file_exists, index=False)
+        return jsonify({"message": "Data appended to CSV successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to save data: {str(e)}"}), 500
+
+@app.route('/test', methods=['GET'])
+def test():
+    return "Flask is working!"
+
+
 # =================== Run ===================
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
+
+
